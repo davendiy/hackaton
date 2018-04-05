@@ -38,9 +38,9 @@
 Під час розбору кожна функція забирає токени зі списку токенів tokens,
 а також додає команди до списку команд code
 """
-import hacaton2.storage as storage
-from hacaton2.tokenizer import get_tokens
-from hacaton2.syntax_analyzer import check_assignment_syntax
+import storage
+from tokenizer import get_tokens
+from syntax_analyzer import check_assignment_syntax
 
 COMMANDS = ("LOADC",
             "LOADV",

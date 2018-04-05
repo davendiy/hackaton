@@ -19,13 +19,20 @@ ERRORS = {0: "",
 
 
 def add(variable):
+    global _storage, _last_error
     """
     Функція додає змінну у память.
     Якщо така змінна вже існує, то встановлює помилку
     :param variable: змінна
     :return: None
     """
-
+    if variable in _storage.keys():
+        _last_error = 1
+        return
+    else:
+        _storage[variable] = None
+        _last_error = 0
+        return
 
 
 def is_in(variable):
@@ -34,6 +41,11 @@ def is_in(variable):
     :param variable: змінна
     :return: булівське значенна (True, якщо є)
     """
+    global _storage, _last_error
+    _last_error = 0
+    if variable in _storage.keys():
+        return True
+    return False
 
 
 def get(variable):
@@ -44,6 +56,16 @@ def get(variable):
     :param variable: змінна
     :return: значення змінної
     """
+    global _storage, _last_error
+    if variable not in _storage.keys():
+        _last_error = 2
+        return
+    tmp = _storage.get(variable, 'KASJHDHASGFHKSAHFKJHSAKFHKSFKHBFKJBSAFBNSF')
+    if tmp is None:
+        _last_error = 3
+        return
+    _last_error = 0
+    return _storage[variable]
 
 
 def set(variable, value):
@@ -54,6 +76,13 @@ def set(variable, value):
     :param value: нове значення
     :return: None
     """
+    global _storage, _last_error
+    if variable not in _storage.keys():
+        _last_error = 2
+        return
+    _last_error = 0
+    _storage[variable] = value
+    return
 
 
 def input_var(variable):
@@ -63,6 +92,13 @@ def input_var(variable):
     :param variable: змінна
     :return: None
     """
+    global _storage, _last_error
+    if variable not in _storage.keys():
+        _last_error = 2
+        return
+    _last_error = 0
+    _storage[variable] = float(input('Value: '))
+    return
 
 
 def input_all():
@@ -71,6 +107,10 @@ def input_all():
     усіх змінних з пам'яті
     :return: None
     """
+    global _storage, _last_error
+    _last_error = 0
+    for var, val in _storage.items():
+        _storage[var] = float(input('Value of ' + str(var) + ' '))
 
 
 def clear():
@@ -78,23 +118,22 @@ def clear():
     Функція видаляэ усы змынны з пам'яті
     :return: None
     """
+    global _storage
+    global _last_error
+    _last_error = 0
+    _storage = {}
 
 
 def get_last_error():
     """
-    Функція повертає код останньої помилки code
+    Функція повертає код ьостанньої помилки code
     Для виведення повідомлення треба взяти
     storage.ERRORS[code]
     усіх змінних з пам'яті
     :return: код останньої помилки
     """
-
-
-def get_all():
-    """
-    Функція повертає словник змінних пам'яті
-    :return: словник змінних
-    """
+    global _last_error
+    return _last_error
 
 
 if __name__ == "__main__":
@@ -123,7 +162,7 @@ if __name__ == "__main__":
     success = success and get_last_error() == 0
     add("d")
     success = success and get_last_error() == 0
-    input_all() # ввести значення a = 3, d = 4
+    input_all()  # ввести значення a = 3, d = 4
     success = success and get_last_error() == 0
     c = get("a")
     success = success and c == 3 and get_last_error() == 0

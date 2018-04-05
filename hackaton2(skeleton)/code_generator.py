@@ -38,9 +38,9 @@
 Під час розбору кожна функція забирає токени зі списку токенів tokens,
 а також додає команди до списку команд code
 """
-import storage
-from tokenizer import get_tokens
-from syntax_analyzer import check_assignment_syntax
+import hacaton2.storage as storage
+from hacaton2.tokenizer import get_tokens
+from hacaton2.syntax_analyzer import check_assignment_syntax
 
 COMMANDS = ("LOADC",
             "LOADV",
@@ -54,6 +54,7 @@ COMMANDS = ("LOADC",
 def generate_code(program_lines):
     """
     Функція генерує код за списком рядків програми program_lines
+
     Повертає програмний код у вигляді списку кортежів
     (<код_команди>, <операнд>)
     Також, якщо під час генерації коду або аналізу виникає помилка,
@@ -63,18 +64,24 @@ def generate_code(program_lines):
     :return: список команд - кортежів (<код_команди>, <операнд>)
     :return: текст помилки
     """
-    res = []
+    storage.clear()
+    code = []
+    err = ''
     for line in program_lines:
-        tmp = _generate_line_code(line)
-        if tmp[1]:
-            return tmp[1]
-        res.append(tmp[0])
-    return res
+        tmp_code, err = _generate_line_code(line)
+        if err and err != "Порожній вираз":
+            break
+        elif err == "Порожній вираз":
+            continue
+        code += tmp_code
+
+    return code, err
 
 
 def _generate_line_code(program_line):
     """
     Функція генерує код за рядком програми program_line.
+
     Рядок програми має бути присвоэнням виду x = e,
     де x - змінна, e - вираз, або порожнім рядком.
     Використовує модулі tokenizer та syntax_analyzer для розбору
@@ -91,19 +98,27 @@ def _generate_line_code(program_line):
     :return: список команд - кортежів (<код_команди>, <операнд>)
     :return: текст помилки
     """
+
     tokens = get_tokens(program_line)
-    succ, error = check_assignment_syntax(tokens)
+    succ, err = check_assignment_syntax(tokens)
+    if not succ:
+        return [], err
+
+    expression_tokens = tokens[2:]
     code = []
-    if succ:
-        code = []
-        _expression(code, tokens[2:])
-        code.append((COMMANDS[6], tokens[0].value))
-    return code, error
+    _expression(code, expression_tokens)
+
+    if not storage.is_in(tokens[0].value):
+        storage.add(tokens[0].value)
+
+    code.append((COMMANDS[6], tokens[0].value))
+    return code, err
 
 
 def _expression(code, tokens):
     """
     Функція генерує код за списком токенів виразу.
+
     Використовує функцію _term для генерації коду доданку, після чого,
     поки список токенів не спорожніє і поточний токен - це операція
     '+' або '-', знову використовує _term для наступного доданку та
@@ -115,18 +130,21 @@ def _expression(code, tokens):
     :return: None
     """
     _term(code, tokens)
-    while tokens:
-        if tokens[0][1] == '+':
-            code.append((COMMANDS[2],None))
-            tokens = tokens[1:]
-        elif tokens[0][1] == '-':
+    while tokens and tokens[0].value in '+-':
+        if tokens[0].value == "+":
+            del tokens[0]
+            _term(code, tokens)
+            code.append((COMMANDS[2], None))
+        else:
+            del tokens[0]
+            _term(code, tokens)
             code.append((COMMANDS[3], None))
-            tokens = tokens[1:]
 
 
 def _term(code, tokens):
     """
     Функція генерує код за списком токенів, що починається токенами доданку.
+
     Використовує функцію _factor для генерації коду множника, після чого,
     поки список токенів не спорожніє і поточний токен - це операція
     '*' або '/', знову використовує _factor для наступного множника та
@@ -137,21 +155,23 @@ def _term(code, tokens):
     :param tokens: список токенів
     :return: None
     """
-    _factor(code,tokens)
-    while tokens:
-        if tokens[0][1] == '*':
-            code.append((COMMANDS[4],None))
-            tokens = tokens[1:]
-            break
-        elif tokens[0][1] == '/':
-            code.append((COMMANDS[5],None))
-            tokens = tokens[1:]
-            break
+    _factor(code, tokens)
+    while tokens and tokens[0].value in "*/":
+
+        if tokens[0].value == '*':
+            del tokens[0]
+            _factor(code, tokens)
+            code.append((COMMANDS[4], None))
+        else:
+            del tokens[0]
+            _factor(code, tokens)
+            code.append((COMMANDS[5], None))
 
 
 def _factor(code, tokens):
     """
     Функція генерує код за списком токенів, що починається токенами множника.
+
     Якщо перший токен - "left_paren", то множник - це вираз у дужках і треба
     викликати функцію _expression, після чого пропустити праву дужку.
     Якщо перший токен - константа або змінна, то треба згенерувати команду
@@ -163,60 +183,68 @@ def _factor(code, tokens):
     :param tokens: список токенів
     :return: None
     """
-    while tokens:
-        if tokens[0][0] == "constant":
-            code.append((COMMANDS[0], float(tokens[0][1])))
-            tokens = tokens[1:]
-            break
-        if tokens[0][0] == "variable":
-            code.append((COMMANDS[1],tokens[0][1]))
-            tokens = tokens[1:]
-            break
-        if tokens[0][1] == "(":
-            for i in range(len(tokens)):
-                if tokens[i][1] == ")":
-                    _expression(code,tokens[1:i])
-                    if len(tokens) == i:
-                        tokens = []
-                    else:
-                        tokens = tokens[i+1:]
+    n = 1
+    if tokens[0].type == 'left_paren':
+        t = 0
+        for tok in tokens:
+            if tok.type == 'left_paren':
+                t += 1
+            elif tok.type == 'right_paren':
+                t -= 1
+            if t == 0:
+                tmp_tokens = tokens[1:n-1]
+                _expression(code, tmp_tokens)
+                del tokens[:n]
+                n = 0
+                break
+            n += 1
+    elif tokens[0].type == 'variable':
+        if not storage.is_in(tokens[0].value):
+            storage.add(tokens[0].value)
+
+        code.append((COMMANDS[1], tokens[0].value))
+
+    elif tokens[0].type == 'constant':
+        code.append((COMMANDS[0], float(tokens[0].value)))
+
+    del tokens[:n]
 
 
 if __name__ == "__main__":
-    code, error = generate_code(["a = b + c", "y = (2 - 1"])
+    code0, error = generate_code(["a = b + c", "y = (2 - 1"])
     success = error == "Неправильно розставлені дужки"
 
-    code, error = generate_code(["x = 1",
-                                 "z = (((a)))",
-                                 "a = b + c * (d - e)",
-                                 "y = (2 - 1) * (x345 + 3 * d) / 234.5 - z"])
+    code1, error = generate_code(["x = 1",
+                                  "z = (((a)))",
+                                  "a = b + c * (d - e)",
+                                  "y = (2 - 1) * (x345 + 3 * d) / 234.5 - z"])
     success = success and not error and \
-        code == [('LOADC', 1.0),
-                 ('SET', 'x'),
-                 ('LOADV', 'a'),
-                 ('SET', 'z'),
-                 ('LOADV', 'b'),
-                 ('LOADV', 'c'),
-                 ('LOADV', 'd'),
-                 ('LOADV', 'e'),
-                 ('SUB', None),
-                 ('MUL', None),
-                 ('ADD', None),
-                 ('SET', 'a'),
-                 ('LOADC', 2.0),
-                 ('LOADC', 1.0),
-                 ('SUB', None),
-                 ('LOADV', 'x345'),
-                 ('LOADC', 3.0),
-                 ('LOADV', 'd'),
-                 ('MUL', None),
-                 ('ADD', None),
-                 ('MUL', None),
-                 ('LOADC', 234.5),
-                 ('DIV', None),
-                 ('LOADV', 'z'),
-                 ('SUB', None),
-                 ('SET', 'y')]
+        code1 == [('LOADC', 1.0),
+                  ('SET', 'x'),
+                  ('LOADV', 'a'),
+                  ('SET', 'z'),
+                  ('LOADV', 'b'),
+                  ('LOADV', 'c'),
+                  ('LOADV', 'd'),
+                  ('LOADV', 'e'),
+                  ('SUB', None),
+                  ('MUL', None),
+                  ('ADD', None),
+                  ('SET', 'a'),
+                  ('LOADC', 2.0),
+                  ('LOADC', 1.0),
+                  ('SUB', None),
+                  ('LOADV', 'x345'),
+                  ('LOADC', 3.0),
+                  ('LOADV', 'd'),
+                  ('MUL', None),
+                  ('ADD', None),
+                  ('MUL', None),
+                  ('LOADC', 234.5),
+                  ('DIV', None),
+                  ('LOADV', 'z'),
+                  ('SUB', None),
+                  ('SET', 'y')]
 
     success = success and storage.is_in('a')
     success = success and storage.is_in('x')

@@ -1,3 +1,2 @@
-# hackaton
 
-# good luck, have fun!
+# good luck, have fun

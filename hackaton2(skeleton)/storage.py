@@ -43,9 +43,8 @@ def is_in(variable):
     """
     global _storage, _last_error
     _last_error = 0
-    if variable in _storage.keys():
-        return True
-    return False
+
+    return variable in _storage.keys()
 
 
 def get(variable):
@@ -97,7 +96,7 @@ def input_var(variable):
         _last_error = 2
         return
     _last_error = 0
-    _storage[variable] = float(input('Value: '))
+    _storage[variable] = float(input('Value of {}: '.format(variable)))
     return
 
 
@@ -134,6 +133,11 @@ def get_last_error():
     """
     global _last_error
     return _last_error
+
+
+def get_all():
+    global _storage
+    return _storage
 
 
 if __name__ == "__main__":

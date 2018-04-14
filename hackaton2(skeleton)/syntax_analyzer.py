@@ -29,7 +29,8 @@
 для присвоєння має повернути
 булівське значення та (можливо) помилку.
 """
-from tokenizer import Token, get_tokens
+
+from .tokenizer import get_tokens
 
 # словник множин допустимих наступних токеныв для заданого токена
 VALID_PAIRS = {"variable": {"operation", "right_paren"},
@@ -74,7 +75,6 @@ def check_assignment_syntax(tokens):
         succ3 = tokens[1].value == '='
     else:
         error = ERRORS["empty_expr"]
-
 
     if succ1 and succ2 and succ3:
         tmp_tokens = tokens[2:]

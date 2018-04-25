@@ -38,9 +38,10 @@
 Під час розбору кожна функція забирає токени зі списку токенів tokens,
 а також додає команди до списку команд code
 """
-import storage
-from tokenizer import get_tokens
-from syntax_analyzer import check_assignment_syntax
+
+from .storage import is_in, clear, add
+from .tokenizer import get_tokens
+from .syntax_analyzer import check_assignment_syntax
 
 COMMANDS = ("LOADC",
             "LOADV",
@@ -51,7 +52,7 @@ COMMANDS = ("LOADC",
             "SET")
 
 
-def generate_code(program_lines):
+def generate_code(program_lines, clear_storage=True):
     """
     Функція генерує код за списком рядків програми program_lines
 
@@ -61,10 +62,12 @@ def generate_code(program_lines):
     то повертає текст помилки. Якщо помилки немає, то повертає порожній рядок.
     Побічний ефект: очищує пам'ять.
     :param program_lines: список рядків програми
+    :param clear_storage: флаг, чи очищати пам'ять
     :return: список команд - кортежів (<код_команди>, <операнд>)
     :return: текст помилки
     """
-    storage.clear()
+    if clear_storage:
+        clear()
     code = []
     err = ''
     for line in program_lines:
@@ -108,8 +111,8 @@ def _generate_line_code(program_line):
     code = []
     _expression(code, expression_tokens)
 
-    if not storage.is_in(tokens[0].value):
-        storage.add(tokens[0].value)
+    if not is_in(tokens[0].value):
+        add(tokens[0].value)
 
     code.append((COMMANDS[6], tokens[0].value))
     return code, err
@@ -199,8 +202,8 @@ def _factor(code, tokens):
                 break
             n += 1
     elif tokens[0].type == 'variable':
-        if not storage.is_in(tokens[0].value):
-            storage.add(tokens[0].value)
+        if not is_in(tokens[0].value):
+            add(tokens[0].value)
 
         code.append((COMMANDS[1], tokens[0].value))
 
@@ -246,7 +249,7 @@ if __name__ == "__main__":
                   ('SUB', None),
                   ('SET', 'y')]
 
-    success = success and storage.is_in('a')
-    success = success and storage.is_in('x')
+    success = success and is_in('a')
+    success = success and is_in('x')
 
     print("Success =", success)

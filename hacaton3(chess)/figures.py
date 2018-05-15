@@ -498,7 +498,7 @@ class Position:
         :param pre_moves: кортеж з кортежів - попередні ходи
         :return: словник {key=попередні ходи: value=об'єкт Position}
         """
-        all_desks = {}
+        all_desks = []
         for pos1, mb_pos in right_moves.items():    # проходимо по всіх допустимих ходах
             figure = self.current_state[pos1]
             for pos2 in mb_pos:
@@ -506,7 +506,7 @@ class Position:
                     tmp_desk = Position(self.current_state)      # створюємо новий об'єкт Position
                     king_alive = tmp_desk.move(pos1, pos2)       # робимо хід
                     if king_alive:                            # якщо король залишився живий
-                        all_desks[(*pre_moves, (ch2ch(pos1), ch2ch(pos2)))] = tmp_desk  # додаємо цю дошку до словника
+                        all_desks.append((*pre_moves, (ch2ch(pos1), ch2ch(pos2))))  # запам'ятовуємо хід
                     else:
                         return {}           # якщо короля з'їли, то дана ситуація - некоректна
                 else:
@@ -514,12 +514,27 @@ class Position:
                         tmp_desk = Position(self.current_state)          # проходимо по всіх можливих трансформаціях
 
                         king_alive = tmp_desk.move(pos1, pos2, transform)   # аналогічно робимо хід
-                        if king_alive and tmp_desk not in all_desks.values():
-                            all_desks[(*pre_moves, (ch2ch(pos1), ch2ch(pos2), transform))] = tmp_desk
+                        new_desk = (*pre_moves, (ch2ch(pos1), ch2ch(pos2), transform))
+                        if king_alive and new_desk not in all_desks:     # запам'ятовуємо хід, якщо його не було
+                            all_desks.append(new_desk)
                         elif not king_alive:
                             return {}        # якщо короля з'їли, то дана ситуація - некоректна
 
         return all_desks
+
+    def _do_moves(self, moves):
+        """
+        метод, який за послідовністю ходів робить відповідні
+        ходи на дошці
+
+        :param moves: список з кортежів(start_pos, end_pos, transform='')
+        :return: None
+        """
+        for turn in moves:
+            if len(turn) == 2:
+                self.move(ch2py(turn[0]), ch2py(turn[1]))
+            else:
+                self.move(ch2py(turn[0]), ch2py(turn[1]), transform2=turn[2])
 
     def find_checkmates(self, color, deep_step):
         """
@@ -529,26 +544,31 @@ class Position:
         кожної з них перевіряємо шах і мат та аналогічно створюємо далі всі можливі ситуації і т.д.
         :param color: колір сторони, яка ходить першою
         :param deep_step: ціле число - глибина пошуку
-        :return: словник  {key=кортеж з кортежів - послідовність ходів, які призводять до мату:
-                           value=об'єкт Position}
+        :return: список з кортежів (кортеж(start, end, transform), кортеж(start, end) ...),
+                                        де start - стартова позиція
+                                        end - кінцева позиція
+                                        transform - фігура, в яку перетворився пішак, якщо була така ситуація
         """
         alter_color = 'b' if color == 'w' else 'w'
-        all_desks = {'': Position(self.current_state)}   # словник, який містить в собі усі ситуації одного покоління
-        all_checkmates = {}
+        all_desks = ['']   # словник, який містить в собі усі ситуації одного покоління
+        all_checkmates = []
         checkmate, right_moves = self.check_mate(color, possible_moves=True)
         if not checkmate:
             for step in range(deep_step):     # якщо на першому кроці відсутній шах і мат
-                tmp_all_desks = {}     # наступне покоління
+                tmp_all_desks = []     # наступне покоління
 
-                # проходимо по всіх ситуаціях step-го покоління
-                for pre, tmp_desk in all_desks.items():      # кожну ситуацію перевіряємо на шах і мат
+                # проходимо по всіх ситуаціях step-го покоління (кожна ситуація описана послідовністю ходів)
+                for pre in all_desks:      # кожну ситуацію перевіряємо на шах і мат
+                    tmp_desk = Position(self.current_state)  # для цього створюємо тимчасову дошку
+                    tmp_desk._do_moves(pre)                 # робимо на ній ходи
                     tmp_checkmate, tmp_right_moves = tmp_desk.check_mate(color, possible_moves=True)
                     if not tmp_checkmate and step != deep_step - 1:     # якщо все норм, то створюємо можливі ситуації
-                        tmp_all_desks.update(tmp_desk._create_all_possible_desks(tmp_right_moves, pre))
+                        tmp_all_desks += tmp_desk._create_all_possible_desks(tmp_right_moves, pre)
                     elif not tmp_checkmate:
                         continue     # якщо вже останнє покоління, то ситуації нафіг нада
                     elif tmp_checkmate:                             # якщо шах і мат - додаємо до словника
-                        all_checkmates[pre] = tmp_desk
+                        all_checkmates.append(pre)
+
                 all_desks = tmp_all_desks      # забуваємо теперішнє покоління і переходим до наступного
                 n = len(all_desks)       # <optional> - виводимо інфу про к-ть ситуацій в поколінні
                 print(n)
@@ -578,6 +598,7 @@ class Position:
 
 if __name__ == "__main__":
 
+    # перевірка ситуації з хакатона
     DESK = Position()
     DESK.add_figure(ch2py('a7'), Figure('queen', 'w'))
     DESK.add_figure(ch2py('b3'), Figure('king', 'w'))
@@ -595,13 +616,14 @@ if __name__ == "__main__":
     input("press enter to continue")
 
     print('find_checkmates:')
-    checkmates = DESK.find_checkmates('w', 5)
-    for i in checkmates.keys():
+    checkmates = DESK.find_checkmates('w', 4)
+    for i in checkmates:
         print(i)
 
-    # input('press enter to continue')
-    # DESK2 = Position()
-    # DESK2.create_start_position()
-    # checkmates = DESK2.find_checkmates('w', 5)
-    # for i in checkmates.keys():
-    #     print(i)
+    # перевірка стартової ситуації
+    input('press enter to continue')
+    DESK2 = Position()
+    DESK2.create_start_position()
+    checkmates = DESK2.find_checkmates('w', 5)
+    for i in checkmates:
+        print(i)
